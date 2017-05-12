@@ -2,3 +2,4 @@
 *.toml text=auto
 *.lock text=auto
 *.txt text=auto
+*.md text=auto
