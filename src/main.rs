@@ -32,11 +32,11 @@ struct Palette {
     b: [u8; 256],
 }
 
-fn read_string<T: ReadBytesExt>(buf: &mut T, len: u32) -> String {
-    let mut str = Vec::new();
-    for _ in 0..len {
+fn read_string<T: ReadBytesExt>(buf: &mut T, len: usize) -> String {
+    let mut str = vec![' ' as u8; len];
+    for i in 0..len {
         match buf.read_u8() {
-            Ok(b) => str.push(b),
+            Ok(b) => str[i] = b,
             Err(err) => println!("error {}", err)
         }
     }
@@ -64,7 +64,11 @@ fn read_palette_data<T: ReadBytesExt>(mut buf: &mut T) -> Palette {
 
     for i in 0..256 {
         p.r[i] = buf.read_u8().unwrap();
+    }
+    for i in 0..256 {
         p.g[i] = buf.read_u8().unwrap();
+    }
+    for i in 0..256 {
         p.b[i] = buf.read_u8().unwrap();
     }
 
@@ -138,6 +142,10 @@ fn main() {
             }
         }
     }
+
+    println!("Found {} bitmaps", bitmaps.len());
+    println!("Found {} palettes", palettes.len());
+    println!("Found {} textures", textures.len());
 
     for (i, t) in textures.iter().enumerate() {
         let bmp = &bitmaps[t.bitmap_idx];
