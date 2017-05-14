@@ -52,10 +52,11 @@ fn read_header<T: ReadBytesExt>(mut buf: &mut T) -> Result<(u16, u32), std::io::
 }
 
 fn read_file_info<T: ReadBytesExt>(mut buf: &mut T) {
-    println!("got name: {}", read_string(&mut buf, 32));
-    println!("got author: {}", read_string(&mut buf, 32));
-    println!("got date: {}", read_string(&mut buf, 32));
-    println!("got version: {}", read_string(&mut buf, 16));
+    println!("GOB Info:");
+    println!("Name: {}", read_string(&mut buf, 32));
+    println!("Author: {}", read_string(&mut buf, 32));
+    println!("Date: {}", read_string(&mut buf, 32));
+    println!("VEDIT Version: {}", read_string(&mut buf, 16));
 }
 
 fn read_palette_data<T: ReadBytesExt>(mut buf: &mut T) -> Palette {
@@ -101,7 +102,7 @@ fn read_texture_data<T: ReadBytesExt>(mut buf: &mut T) -> Texture {
 
 
 fn main() {
-    let mut file = File::open("C:\\Users\\Daniel\\Downloads\\alien-cabal\\AlienCabal\\acabal.gob").unwrap();
+    let mut file = File::open("acabal.gob").unwrap();
 
     let mut data = Vec::new();
     file.read_to_end(&mut data);
@@ -133,7 +134,7 @@ fn main() {
             20 => read_file_info(&mut buffer),
             _ => {
                 println!("unknown id {}", header.0);
-                buffer.seek(SeekFrom::Current((header.1 as i64) - 6));
+                let _ = buffer.seek(SeekFrom::Current((header.1 as i64) - 6));
             }
         }
     }
