@@ -5,3 +5,4 @@ authors = ["Daniel Cook <daniel@danielcook.me>"]
 
 [dependencies]
 byteorder = "1.0.0"
+bmp = "*"
