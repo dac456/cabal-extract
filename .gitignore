@@ -2,3 +2,4 @@ target/
 **/*.rs.bk
 .idea/
 cmake-build-debug/
+acabal.gob
