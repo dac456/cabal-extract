@@ -12,6 +12,9 @@ use byteorder::{LittleEndian, ReadBytesExt};
 
 use bmp::{Pixel, Image};
 
+mod postprocess;
+use postprocess::superxbr;
+
 struct Texture {
     name: String,
     bitmap_idx: usize,
@@ -30,6 +33,10 @@ struct Palette {
     r: [u8; 256],
     g: [u8; 256],
     b: [u8; 256],
+}
+
+struct Level {
+    rebuild_zone: u16
 }
 
 fn read_string<T: ReadBytesExt>(buf: &mut T, len: usize) -> String {
@@ -53,10 +60,10 @@ fn read_header<T: ReadBytesExt>(mut buf: &mut T) -> Result<(u16, u32), std::io::
 
 fn read_file_info<T: ReadBytesExt>(mut buf: &mut T) {
     println!("GOB Info:");
-    println!("Name: {}", read_string(&mut buf, 32));
-    println!("Author: {}", read_string(&mut buf, 32));
-    println!("Date: {}", read_string(&mut buf, 32));
-    println!("VEDIT Version: {}", read_string(&mut buf, 16));
+    println!(" -- Name: {}", read_string(&mut buf, 32));
+    println!(" -- Author: {}", read_string(&mut buf, 32));
+    println!(" -- Date: {}", read_string(&mut buf, 32));
+    println!(" -- VEDIT Version: {}", read_string(&mut buf, 16));
 }
 
 fn read_palette_data<T: ReadBytesExt>(mut buf: &mut T) -> Palette {
@@ -104,6 +111,13 @@ fn read_texture_data<T: ReadBytesExt>(mut buf: &mut T) -> Texture {
     return texture
 }
 
+fn read_level_data<T: ReadBytesExt>(mut buf: &mut T) -> Level {
+    let mut level = Level { rebuild_zone: 0 };
+//    let hdr_size = buf.read_u16::<LittleEndian>().unwrap();
+
+    return level
+}
+
 
 fn main() {
     let mut file = File::open("acabal.gob").unwrap();
@@ -115,6 +129,7 @@ fn main() {
     let mut palettes = Vec::new();
     let mut bitmaps = Vec::new();
     let mut textures = Vec::new();
+    let mut levels = Vec::new();
 
     loop {
         let header = match read_header(&mut buffer){
@@ -136,6 +151,12 @@ fn main() {
                 textures.push(t);
             },
             20 => read_file_info(&mut buffer),
+            33 => println!("old level data"),
+            40 => {
+                let _ = buffer.seek(SeekFrom::Current((header.1 as i64) - 6));
+                let l = read_level_data(&mut buffer);
+                levels.push(l)
+            },
             _ => {
                 println!("unknown id {}", header.0);
                 let _ = buffer.seek(SeekFrom::Current((header.1 as i64) - 6));
@@ -146,6 +167,7 @@ fn main() {
     println!("Found {} bitmaps", bitmaps.len());
     println!("Found {} palettes", palettes.len());
     println!("Found {} textures", textures.len());
+    println!("Found {} levels", levels.len());
 
     for (i, t) in textures.iter().enumerate() {
         let bmp = &bitmaps[t.bitmap_idx];
