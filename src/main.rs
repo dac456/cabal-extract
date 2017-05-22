@@ -4,6 +4,7 @@
 extern crate byteorder;
 extern crate bmp;
 
+use std::fs;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::string::String;
@@ -121,6 +122,8 @@ fn read_level_data<T: ReadBytesExt>(mut buf: &mut T) -> Level {
 
 
 fn main() {
+//    fs::create_dir("./out").unwrap();
+
     let mut file = File::open("acabal.gob").unwrap();
 
     let mut data = Vec::new();
@@ -172,37 +175,45 @@ fn main() {
 
     for (i, t) in textures.iter().enumerate() {
         let bmp = &bitmaps[t.bitmap_idx];
-        let mut img = Image::new(bmp.width*2, bmp.height*2);
+        let mut img = Image::new(bmp.width * 2, bmp.height * 2);
+//        let mut img = Image::new(bmp.width, bmp.height);
 
-        let mut to_scale = vec![0u32; (bmp.width*bmp.height) as usize];
-        let mut scaled = vec![0u32; (bmp.width*bmp.height*4) as usize];
+        let mut to_scale = vec![0u32; (bmp.width * bmp.height) as usize];
+        let mut scaled = vec![0u32; (bmp.width * bmp.height * 4) as usize];
 
         for y in 0..bmp.height {
             for x in 0..bmp.width {
-                let pixel = bmp.data[((y * bmp.width) + x) as usize];
+                let y_flip: u32 = (y as i32 - (bmp.height - 1) as i32).abs() as u32;
+                let pixel = bmp.data[((y_flip * bmp.width) + x) as usize];
                 let r = palettes[t.colour_idx].r[pixel as usize];
                 let g = palettes[t.colour_idx].g[pixel as usize];
                 let b = palettes[t.colour_idx].b[pixel as usize];
 
                 let p: u32 = (r as u32) | ((g as u32) << 8) | ((b as u32) << 16) | ((255 as u32) << 24);
                 to_scale[((y * bmp.width) + x) as usize] = p;
-
-                //            img.set_pixel(x, y, Pixel { r: r, g: g, b: b });
+//                img.set_pixel(x, y, Pixel { r: r, g: g, b: b });
             }
         }
 
         superxbr::scale(to_scale.as_mut_slice(), scaled.as_mut_slice(), bmp.width as i32, bmp.height as i32);
 
-        for (x, y) in img.coordinates() {
-            let idx: usize = ((y * bmp.width) + x) as usize;
-            let r: u8 = (scaled[idx] & 0xff) as u8;
-            let g: u8 = ((scaled[idx] >> 8) & 0xff) as u8;
-            let b: u8 = ((scaled[idx] >> 16) & 0xff) as u8;
+//        for (x, y) in img.coordinates() {
+        for y in 0..bmp.height*2 {
+            for x in 0..bmp.width*2 {
+                let idx: usize = ((y * bmp.width*2) + x) as usize;
+                let r: u8 = (scaled[idx] & 0xff) as u8;
+                let g: u8 = ((scaled[idx] >> 8) & 0xff) as u8;
+                let b: u8 = ((scaled[idx] >> 16) & 0xff) as u8;
 
-            img.set_pixel(x, y, Pixel { r: r, g: g, b: b });
+                //            println!("r {} g {} b {}", r, g, b);
+                img.set_pixel(x, y, Pixel { r: r, g: g, b: b });
+            }
         }
 
         println!("Saving texture {}...", i);
-        let _ = img.save(&format!("out/{}.bmp", i)[..]);
+        match img.save(&format!("out/{}.bmp", i)[..]) {
+            Err(err) => panic!("{}", err),
+            Ok(x) => x
+        };
     }
 }
