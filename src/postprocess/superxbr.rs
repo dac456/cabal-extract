@@ -75,10 +75,18 @@ pub fn diagonal_edge(mat: [[f32; 4]; 4], wp: [f32; 6]) -> f32 {
 pub fn scale(data: &[u32], out: &mut [u32], width: i32, height: i32) {
     let f: i32 = 2;
 
+    let wgt1: f32 = 0.129633;
+    let wgt2: f32 = 0.175068;
+    let w1: f32 = -wgt1;
+    let w2: f32 = wgt1 + 0.5;
+    let w3: f32 = -wgt2;
+    let w4: f32 = wgt2 + 0.5;
+
     let outw = width * f;
     let outh = height * f;
 
-    let ws: [f32; 6] = [2.0, 1.0, -1.0, 4.0, -1.0, 1.0];
+    // Pass 1
+    let mut wp: [f32; 6] = [2.0, 1.0, -1.0, 4.0, -1.0, 1.0];
 
     for y in (0..outh).step_by(2) {
         for x in (0..outw).step_by(2) {
@@ -120,16 +128,16 @@ pub fn scale(data: &[u32], out: &mut [u32], width: i32, height: i32) {
 			let max_b: f32 = maxv(vec![b[1][1], b[2][1], b[1][2], b[2][2]]);
 			let max_a: f32 = maxv(vec![a[1][1], a[2][1], a[1][2], a[2][2]]);
 
-            let d_edge: f32 = diagonal_edge(Y, ws);
+            let d_edge: f32 = diagonal_edge(Y, wp);
 
-            let r1: f32 = -0.129633*(r[0][3] + r[3][0]) + 0.629633*(r[1][2] + r[2][1]);
-			let g1: f32 = -0.129633*(g[0][3] + g[3][0]) + 0.629633*(g[1][2] + g[2][1]);
-			let b1: f32 = -0.129633*(b[0][3] + b[3][0]) + 0.629633*(b[1][2] + b[2][1]);
-			let a1: f32 = -0.129633*(a[0][3] + a[3][0]) + 0.629633*(a[1][2] + a[2][1]);
-			let r2: f32 = -0.129633*(r[0][0] + r[3][3]) + 0.629633*(r[1][1] + r[2][2]);
-			let g2: f32 = -0.129633*(g[0][0] + g[3][3]) + 0.629633*(g[1][1] + g[2][2]);
-			let b2: f32 = -0.129633*(b[0][0] + b[3][3]) + 0.629633*(b[1][1] + b[2][2]);
-			let a2: f32 = -0.129633*(a[0][0] + a[3][3]) + 0.629633*(a[1][1] + a[2][2]);
+            let r1: f32 = w1*(r[0][3] + r[3][0]) + w2*(r[1][2] + r[2][1]);
+			let g1: f32 = w1*(g[0][3] + g[3][0]) + w2*(g[1][2] + g[2][1]);
+			let b1: f32 = w1*(b[0][3] + b[3][0]) + w2*(b[1][2] + b[2][1]);
+			let a1: f32 = w1*(a[0][3] + a[3][0]) + w2*(a[1][2] + a[2][1]);
+			let r2: f32 = w1*(r[0][0] + r[3][3]) + w2*(r[1][1] + r[2][2]);
+			let g2: f32 = w1*(g[0][0] + g[3][3]) + w2*(g[1][1] + g[2][2]);
+			let b2: f32 = w1*(b[0][0] + b[3][3]) + w2*(b[1][1] + b[2][2]);
+			let a2: f32 = w1*(a[0][0] + a[3][3]) + w2*(a[1][1] + a[2][2]);
 
             let (mut rf, mut gf, mut bf, mut af) = (0.0, 0.0, 0.0, 0.0);
             if d_edge <= 0.0 {
@@ -149,19 +157,232 @@ pub fn scale(data: &[u32], out: &mut [u32], width: i32, height: i32) {
             bf = clampf(bf, min_b, max_b);
             af = clampf(af, min_a, max_a);
 
-            let ri: i32 = clamp(rf as i32, 0, 255);
-            let gi: i32 = clamp(gf as i32, 0, 255);
-            let bi: i32 = clamp(bf as i32, 0, 255);
-            let ai: i32 = clamp(af as i32, 0, 255);
+            let ri: i32 = clamp(rf.ceil() as i32, 0, 255);
+            let gi: i32 = clamp(gf.ceil() as i32, 0, 255);
+            let bi: i32 = clamp(bf.ceil() as i32, 0, 255);
+            let ai: i32 = clamp(af.ceil() as i32, 0, 255);
 
             out[(y*outw + x) as usize] = data[(cy*width + cx) as usize];
             out[(y*outw + x + 1) as usize] = data[(cy*width + cx) as usize];
             out[((y + 1)*outw + x) as usize] = data[(cy*width + cx) as usize];
 
 			out[((y+1)*outw + x+1) as usize] = ((ai << 24) | (bi << 16) | (gi << 8) | ri) as u32;
-
-//            x += 1;
         }
-//        y += 1;
+    }
+
+    // Pass 2
+    wp = [2.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+
+    for y in (0..outh).step_by(2) {
+        for x in (0..outw).step_by(2) {
+            let cx = x / f;
+            let cy = y / f;
+
+            let mut r: [[f32; 4]; 4] = [[0.0; 4]; 4];
+            let mut g: [[f32; 4]; 4] = [[0.0; 4]; 4];
+            let mut b: [[f32; 4]; 4] = [[0.0; 4]; 4];
+            let mut a: [[f32; 4]; 4] = [[0.0; 4]; 4];
+            let mut Y: [[f32; 4]; 4] = [[0.0; 4]; 4];
+
+            let x_rng: Vec<i32> = vec![-1, 0, 1, 2];
+            let y_rng: Vec<i32> = vec![-1, 0, 1, 2];
+            for sx in x_rng.iter() {
+                for sy in y_rng.iter() {
+                    let csy = clamp(sx - sy + y as i32, 0, f*height - 1);
+                    let csx = clamp(sx + sy + x as i32, 0, f*width - 1);
+                    let sample = out[(csy * outw + csx) as usize];
+
+                    r[(*sx + 1) as usize][(*sy + 1) as usize] = red!(sample) as f32;
+                    g[(*sx + 1) as usize][(*sy + 1) as usize] = green!(sample) as f32;
+                    b[(*sx + 1) as usize][(*sy + 1) as usize] = blue!(sample) as f32;
+                    a[(*sx + 1) as usize][(*sy + 1) as usize] = alpha!(sample) as f32;
+
+                    Y[(*sx + 1) as usize][(*sy + 1) as usize]
+                        = 0.2126 * r[(*sx + 1) as usize][(*sy + 1) as usize]
+                        + 0.7152 * g[(*sx + 1) as usize][(*sy + 1) as usize]
+                        + 0.0722 * b[(*sx + 1) as usize][(*sy + 1) as usize];
+                }
+            }
+
+            let min_r: f32 = minv(vec![r[1][1], r[2][1], r[1][2], r[2][2]]);
+            let min_g: f32 = minv(vec![g[1][1], g[2][1], g[1][2], g[2][2]]);
+			let min_b: f32 = minv(vec![b[1][1], b[2][1], b[1][2], b[2][2]]);
+			let min_a: f32 = minv(vec![a[1][1], a[2][1], a[1][2], a[2][2]]);
+			let max_r: f32 = maxv(vec![r[1][1], r[2][1], r[1][2], r[2][2]]);
+			let max_g: f32 = maxv(vec![g[1][1], g[2][1], g[1][2], g[2][2]]);
+			let max_b: f32 = maxv(vec![b[1][1], b[2][1], b[1][2], b[2][2]]);
+			let max_a: f32 = maxv(vec![a[1][1], a[2][1], a[1][2], a[2][2]]);
+
+            let mut d_edge: f32 = diagonal_edge(Y, wp);
+
+            let mut r1: f32 = w3*(r[0][3] + r[3][0]) + w4*(r[1][2] + r[2][1]);
+			let mut g1: f32 = w3*(g[0][3] + g[3][0]) + w4*(g[1][2] + g[2][1]);
+			let mut b1: f32 = w3*(b[0][3] + b[3][0]) + w4*(b[1][2] + b[2][1]);
+			let mut a1: f32 = w3*(a[0][3] + a[3][0]) + w4*(a[1][2] + a[2][1]);
+			let mut r2: f32 = w3*(r[0][0] + r[3][3]) + w4*(r[1][1] + r[2][2]);
+			let mut g2: f32 = w3*(g[0][0] + g[3][3]) + w4*(g[1][1] + g[2][2]);
+			let mut b2: f32 = w3*(b[0][0] + b[3][3]) + w4*(b[1][1] + b[2][2]);
+			let mut a2: f32 = w3*(a[0][0] + a[3][3]) + w4*(a[1][1] + a[2][2]);
+
+            let (mut rf, mut gf, mut bf, mut af) = (0.0, 0.0, 0.0, 0.0);
+            if d_edge <= 0.0 {
+                rf = r1;
+                gf = g1;
+                bf = b1;
+                af = a1;
+            } else {
+                rf = r2;
+                gf = g2;
+                bf = b2;
+                af = a2;
+            }
+
+            rf = clampf(rf, min_r, max_r);
+            gf = clampf(gf, min_g, max_g);
+            bf = clampf(bf, min_b, max_b);
+            af = clampf(af, min_a, max_a);
+
+            let mut ri: i32 = clamp(rf.ceil() as i32, 0, 255);
+            let mut gi: i32 = clamp(gf.ceil() as i32, 0, 255);
+            let mut bi: i32 = clamp(bf.ceil() as i32, 0, 255);
+            let mut ai: i32 = clamp(af.ceil() as i32, 0, 255);
+
+			out[(y*outw + x+1) as usize] = ((ai << 24) | (bi << 16) | (gi << 8) | ri) as u32;
+
+            for sx in x_rng.iter() {
+                for sy in y_rng.iter() {
+                    let csy = clamp(sx - sy + 1 + y as i32, 0, f*height - 1);
+                    let csx = clamp(sx + sy - 1 + x as i32, 0, f*width - 1);
+                    let sample = out[(csy * outw + csx) as usize];
+
+                    r[(*sx + 1) as usize][(*sy + 1) as usize] = red!(sample) as f32;
+                    g[(*sx + 1) as usize][(*sy + 1) as usize] = green!(sample) as f32;
+                    b[(*sx + 1) as usize][(*sy + 1) as usize] = blue!(sample) as f32;
+                    a[(*sx + 1) as usize][(*sy + 1) as usize] = alpha!(sample) as f32;
+
+                    Y[(*sx + 1) as usize][(*sy + 1) as usize]
+                        = 0.2126 * r[(*sx + 1) as usize][(*sy + 1) as usize]
+                        + 0.7152 * g[(*sx + 1) as usize][(*sy + 1) as usize]
+                        + 0.0722 * b[(*sx + 1) as usize][(*sy + 1) as usize];
+                }
+            }
+
+            d_edge = diagonal_edge(Y, wp);
+
+            r1 = w3*(r[0][3] + r[3][0]) + w4*(r[1][2] + r[2][1]);
+			g1 = w3*(g[0][3] + g[3][0]) + w4*(g[1][2] + g[2][1]);
+			b1 = w3*(b[0][3] + b[3][0]) + w4*(b[1][2] + b[2][1]);
+			a1 = w3*(a[0][3] + a[3][0]) + w4*(a[1][2] + a[2][1]);
+			r2 = w3*(r[0][0] + r[3][3]) + w4*(r[1][1] + r[2][2]);
+			g2 = w3*(g[0][0] + g[3][3]) + w4*(g[1][1] + g[2][2]);
+			b2 = w3*(b[0][0] + b[3][3]) + w4*(b[1][1] + b[2][2]);
+			a2 = w3*(a[0][0] + a[3][3]) + w4*(a[1][1] + a[2][2]);
+
+            let (mut rf, mut gf, mut bf, mut af) = (0.0, 0.0, 0.0, 0.0);
+            if d_edge <= 0.0 {
+                rf = r1;
+                gf = g1;
+                bf = b1;
+                af = a1;
+            } else {
+                rf = r2;
+                gf = g2;
+                bf = b2;
+                af = a2;
+            }
+
+            rf = clampf(rf, min_r, max_r);
+            gf = clampf(gf, min_g, max_g);
+            bf = clampf(bf, min_b, max_b);
+            af = clampf(af, min_a, max_a);
+
+            ri = clamp(rf.ceil() as i32, 0, 255);
+            gi = clamp(gf.ceil() as i32, 0, 255);
+            bi = clamp(bf.ceil() as i32, 0, 255);
+            ai = clamp(af.ceil() as i32, 0, 255);
+
+			out[((y+1)*outw + x) as usize] = ((ai << 24) | (bi << 16) | (gi << 8) | ri) as u32;
+        }
+    }
+
+    // Pass 3
+    wp = [2.0, 1.0, -1.0, 40.0, -1.0, 1.0];
+
+    for y in (0..outh).rev() {
+        for x in (0..outw).rev() {
+            let cx = x / f;
+            let cy = y / f;
+
+            let mut r: [[f32; 4]; 4] = [[0.0; 4]; 4];
+            let mut g: [[f32; 4]; 4] = [[0.0; 4]; 4];
+            let mut b: [[f32; 4]; 4] = [[0.0; 4]; 4];
+            let mut a: [[f32; 4]; 4] = [[0.0; 4]; 4];
+            let mut Y: [[f32; 4]; 4] = [[0.0; 4]; 4];
+
+            let x_rng: Vec<i32> = vec![-2, -1, 0, 1];
+            let y_rng: Vec<i32> = vec![-2, -1, 0, 1];
+            for sx in x_rng.iter() {
+                for sy in y_rng.iter() {
+                    let csy = clamp(sy + y as i32, 0, f * height - 1);
+                    let csx = clamp(sx + x as i32, 0, f * width - 1);
+                    let sample = out[(csy * outw + csx) as usize];
+
+                    r[(*sx + 2) as usize][(*sy + 2) as usize] = red!(sample) as f32;
+                    g[(*sx + 2) as usize][(*sy + 2) as usize] = green!(sample) as f32;
+                    b[(*sx + 2) as usize][(*sy + 2) as usize] = blue!(sample) as f32;
+                    a[(*sx + 2) as usize][(*sy + 2) as usize] = alpha!(sample) as f32;
+
+                    Y[(*sx + 2) as usize][(*sy + 2) as usize]
+                        = 0.2126 * r[(*sx + 2) as usize][(*sy + 2) as usize]
+                        + 0.7152 * g[(*sx + 2) as usize][(*sy + 2) as usize]
+                        + 0.0722 * b[(*sx + 2) as usize][(*sy + 2) as usize];
+                }
+            }
+
+            let min_r: f32 = minv(vec![r[1][1], r[2][1], r[1][2], r[2][2]]);
+            let min_g: f32 = minv(vec![g[1][1], g[2][1], g[1][2], g[2][2]]);
+            let min_b: f32 = minv(vec![b[1][1], b[2][1], b[1][2], b[2][2]]);
+            let min_a: f32 = minv(vec![a[1][1], a[2][1], a[1][2], a[2][2]]);
+            let max_r: f32 = maxv(vec![r[1][1], r[2][1], r[1][2], r[2][2]]);
+            let max_g: f32 = maxv(vec![g[1][1], g[2][1], g[1][2], g[2][2]]);
+            let max_b: f32 = maxv(vec![b[1][1], b[2][1], b[1][2], b[2][2]]);
+            let max_a: f32 = maxv(vec![a[1][1], a[2][1], a[1][2], a[2][2]]);
+
+            let d_edge: f32 = diagonal_edge(Y, wp);
+
+            let r1: f32 = w1 * (r[0][3] + r[3][0]) + w2 * (r[1][2] + r[2][1]);
+            let g1: f32 = w1 * (g[0][3] + g[3][0]) + w2 * (g[1][2] + g[2][1]);
+            let b1: f32 = w1 * (b[0][3] + b[3][0]) + w2 * (b[1][2] + b[2][1]);
+            let a1: f32 = w1 * (a[0][3] + a[3][0]) + w2 * (a[1][2] + a[2][1]);
+            let r2: f32 = w1 * (r[0][0] + r[3][3]) + w2 * (r[1][1] + r[2][2]);
+            let g2: f32 = w1 * (g[0][0] + g[3][3]) + w2 * (g[1][1] + g[2][2]);
+            let b2: f32 = w1 * (b[0][0] + b[3][3]) + w2 * (b[1][1] + b[2][2]);
+            let a2: f32 = w1 * (a[0][0] + a[3][3]) + w2 * (a[1][1] + a[2][2]);
+
+            let (mut rf, mut gf, mut bf, mut af) = (0.0, 0.0, 0.0, 0.0);
+            if d_edge <= 0.0 {
+                rf = r1;
+                gf = g1;
+                bf = b1;
+                af = a1;
+            } else {
+                rf = r2;
+                gf = g2;
+                bf = b2;
+                af = a2;
+            }
+
+            rf = clampf(rf, min_r, max_r);
+            gf = clampf(gf, min_g, max_g);
+            bf = clampf(bf, min_b, max_b);
+            af = clampf(af, min_a, max_a);
+
+            let mut ri: i32 = clamp(rf.ceil() as i32, 0, 255);
+            let mut gi: i32 = clamp(gf.ceil() as i32, 0, 255);
+            let mut bi: i32 = clamp(bf.ceil() as i32, 0, 255);
+            let mut ai: i32 = clamp(af.ceil() as i32, 0, 255);
+
+            out[(y * outw + x) as usize] = ((ai << 24) | (bi << 16) | (gi << 8) | ri) as u32;
+        }
     }
 }
